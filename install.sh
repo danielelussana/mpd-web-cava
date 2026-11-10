@@ -13,8 +13,6 @@
 #    APP_DIR         Dove copiare mpd-spectrum.py          (default: /opt/mpd-web)
 #    MPD_CONF        File di configurazione MPD            (default: /etc/mpd.conf)
 #    FIFO_PATH       FIFO condivisa tra MPD e cava          (default: /tmp/mpd-cava.fifo)
-#    SPECTRUM_PORT   Porta HTTP del bridge cava             (default: 44883)
-#    SERVICE_USER    Utente con cui gira il servizio systemd (default: utente che ha lanciato sudo, o "mpd")
 # ─────────────────────────────────────────────────────────────────────────
 set -Eeuo pipefail
 
@@ -22,8 +20,6 @@ WEBROOT="${WEBROOT:-/var/www/html}"
 APP_DIR="${APP_DIR:-/opt/mpd-web}"
 MPD_CONF="${MPD_CONF:-/etc/mpd.conf}"
 FIFO_PATH="${FIFO_PATH:-/tmp/mpd-cava.fifo}"
-SPECTRUM_PORT="${SPECTRUM_PORT:-44883}"
-SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-mpd}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -78,28 +74,6 @@ install -m 644 "$SCRIPT_DIR/public/mpd-client.php" "$WEBROOT/mpd-client.php"
 install -m 755 "$SCRIPT_DIR/mpd-spectrum.py" "$APP_DIR/mpd-spectrum.py"
 log "Copiato mpd-client.php in $WEBROOT/"
 log "Copiato mpd-spectrum.py in $APP_DIR/"
-
-if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-    warn "L'utente '$SERVICE_USER' non esiste, il servizio girerà come 'mpd'."
-    SERVICE_USER="mpd"
-fi
-
-unit_src="$SCRIPT_DIR/systemd/mpd-spectrum.service"
-unit_dst="/etc/systemd/system/mpd-spectrum.service"
-sed \
-    -e "s|^User=.*|User=$SERVICE_USER|" \
-    -e "s|^Group=.*|Group=$SERVICE_USER|" \
-    -e "s|^WorkingDirectory=.*|WorkingDirectory=$APP_DIR|" \
-    -e "s|^Environment=MPD_SPECTRUM_PORT=.*|Environment=MPD_SPECTRUM_PORT=$SPECTRUM_PORT|" \
-    -e "s|^Environment=MPD_SPECTRUM_SOURCE=.*|Environment=MPD_SPECTRUM_SOURCE=$FIFO_PATH|" \
-    -e "s|^ExecStart=.*|ExecStart=/usr/bin/python3 $APP_DIR/mpd-spectrum.py|" \
-    "$unit_src" > "$unit_dst"
-log "Installata unit systemd in $unit_dst (utente: $SERVICE_USER, porta: $SPECTRUM_PORT, fifo: $FIFO_PATH)"
-
-systemctl daemon-reload
-systemctl enable --now mpd-spectrum.service
-log "Servizio mpd-spectrum avviato. Stato:"
-systemctl --no-pager --lines=5 status mpd-spectrum.service || true
 
 # ── 3. Verifica audio_output in mpd.conf ────────────────────────────────
 log "Verifica configurazione MPD ($MPD_CONF)…"
@@ -199,8 +173,8 @@ cat <<EOF
 ──────────────────────────────────────────────────────────────
  Fatto.
    • Client web:     $WEBROOT/mpd-client.php
-   • Bridge cava:     $APP_DIR/mpd-spectrum.py  (servizio: mpd-spectrum.service)
-   • Bridge in ascolto su: http://127.0.0.1:$SPECTRUM_PORT/bars
+   • Bridge cava:     $APP_DIR/mpd-spectrum.py  (avviato da mpd-client.php alla prima richiesta)
+   • Bridge in ascolto su: http://127.0.0.1:44883/bars
 
  Serve ancora un web server con PHP (lighttpd+php-fpm, apache+mod_php,
  nginx+php-fpm, ecc.) che pubblichi $WEBROOT — questo script non lo installa.

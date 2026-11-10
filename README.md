@@ -16,8 +16,7 @@ The interface is in Italian and designed for both phone and desktop: queue/searc
 |---|---|
 | `public/mpd-client.php` | The whole web app: UI + JSON API (`?api=...`) talking to MPD via `mpc`/TCP socket. Audio output switching (USB/HDMI) is the `switchAudioOutput()` function inside this same file, not a separate script. |
 | `mpd-spectrum.py` | Standalone HTTP bridge: runs `cava` reading a FIFO written by MPD, and exposes the bar amplitudes as JSON at `http://127.0.0.1:44883/bars`. `mpd-client.php` proxies this endpoint (`?api=spectrum`) and starts it itself if it is not already listening. |
-| `systemd/mpd-spectrum.service` | systemd unit to run `mpd-spectrum.py` as a persistent service. |
-| `install.sh` | Installs `cava`/`mpc`/`python3`, copies the files into place, installs and starts the systemd service, and checks/proposes missing lines in `mpd.conf`. |
+| `install.sh` | Installs `cava`/`mpc`/`python3`, copies the files into place, and checks/proposes missing lines in `mpd.conf`. |
 
 ### Architecture
 
@@ -52,8 +51,6 @@ Environment variables accepted by `install.sh` (all optional):
 | `APP_DIR` | `/opt/mpd-web` | Where `mpd-spectrum.py` is copied |
 | `MPD_CONF` | `/etc/mpd.conf` | MPD configuration file to check |
 | `FIFO_PATH` | `/tmp/mpd-cava.fifo` | FIFO shared between MPD and cava |
-| `SPECTRUM_PORT` | `44883` | Port of the cava HTTP bridge |
-| `SERVICE_USER` | the user running `sudo`, or `mpd` | User the systemd service runs as |
 
 Example with custom paths:
 
@@ -117,7 +114,7 @@ After any change to `mpd.conf`: `sudo systemctl restart mpd`.
 
 ### Troubleshooting
 
-- **Spectrum frozen / at zero**: check that the service is running (`systemctl status mpd-spectrum`) and that the fifo output in `mpd.conf` is `enabled` (fifo outputs are always active by default in MPD, but check `mpc outputs` anyway).
+- **Spectrum frozen / at zero**: check that the bridge is running (`curl http://127.0.0.1:44883/health`; `mpd-client.php` starts it on demand) and that the fifo output in `mpd.conf` is `enabled` (fifo outputs are always active by default in MPD, but check `mpc outputs` anyway).
 - **Album cover does not appear**: check that MPD sees the file (`mpc --format %file% current`); it depends on the library's tags/artwork, not on this project.
 - **USB/HDMI buttons do nothing / pick the wrong output**: see the section above about the order of the `audio_output` blocks.
 
@@ -147,8 +144,7 @@ HDMI su Raspberry Pi) e spettrogramma in tempo reale.
 |---|---|
 | `public/mpd-client.php` | L'intera web app: UI + API JSON (`?api=...`) che parla con MPD via `mpc`/socket TCP. Il cambio uscita audio (USB/HDMI) è la funzione `switchAudioOutput()` dentro questo stesso file — non è uno script separato. |
 | `mpd-spectrum.py` | Bridge HTTP standalone: lancia `cava` leggendo una FIFO scritta da MPD, ed espone le ampiezze delle barre come JSON su `http://127.0.0.1:44883/bars`. `mpd-client.php` fa da proxy verso questo endpoint (`?api=spectrum`) e lo avvia da solo se non lo trova già in ascolto. |
-| `systemd/mpd-spectrum.service` | Unit systemd per far girare `mpd-spectrum.py` come servizio persistente. |
-| `install.sh` | Installa `cava`/`mpc`/`python3`, copia i file al loro posto, installa e avvia il servizio systemd, e verifica/propone le righe mancanti in `mpd.conf`. |
+| `install.sh` | Installa `cava`/`mpc`/`python3`, copia i file al loro posto, e verifica/propone le righe mancanti in `mpd.conf`. |
 
 ### Architettura
 
@@ -186,8 +182,6 @@ Variabili d'ambiente accettate da `install.sh` (tutte opzionali):
 | `APP_DIR` | `/opt/mpd-web` | Dove viene copiato `mpd-spectrum.py` |
 | `MPD_CONF` | `/etc/mpd.conf` | File di configurazione MPD da controllare |
 | `FIFO_PATH` | `/tmp/mpd-cava.fifo` | FIFO condivisa tra MPD e cava |
-| `SPECTRUM_PORT` | `44883` | Porta del bridge HTTP cava |
-| `SERVICE_USER` | utente che lancia `sudo`, o `mpd` | Utente con cui gira il servizio systemd |
 
 Esempio con percorsi personalizzati:
 
@@ -262,8 +256,8 @@ Dopo qualsiasi modifica a `mpd.conf`: `sudo systemctl restart mpd`.
 
 ### Troubleshooting
 
-- **Spettrogramma fermo / a zero**: verifica che il servizio giri
-  (`systemctl status mpd-spectrum`) e che l'output fifo in `mpd.conf` sia
+- **Spettrogramma fermo / a zero**: verifica che il bridge giri
+  (`curl http://127.0.0.1:44883/health`; lo avvia `mpd-client.php` quando serve) e che l'output fifo in `mpd.conf` sia
   `enabled` (di default gli output fifo sono sempre attivi in MPD, ma
   controlla comunque `mpc outputs`).
 - **Copertina album non appare**: verifica che MPD veda il file
