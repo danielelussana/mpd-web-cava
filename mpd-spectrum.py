@@ -328,7 +328,8 @@ def main() -> None:
 
     def shutdown(*_: object) -> None:
         STATE.stop()
-        server.shutdown()
+        # shutdown() blocca se chiamato dal thread che esegue serve_forever()
+        threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
